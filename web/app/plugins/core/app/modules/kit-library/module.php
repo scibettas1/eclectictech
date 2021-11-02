@@ -1,16 +1,15 @@
 <?php
-namespace Elementor\Core\App\Modules\KitLibrary;
+namespace ElementorPro\Core\App\Modules\KitLibrary;
 
-use Elementor\Plugin;
-use Elementor\TemplateLibrary\Source_Local;
+use ElementorPro\Plugin;
+use ElementorPro\License\API;
+use ElementorPro\License\Admin;
 use Elementor\Core\Base\Module as BaseModule;
+use ElementorPro\Core\Connect\Apps\Activate;
 use Elementor\Core\App\Modules\KitLibrary\Connect\Kit_Library;
-use Elementor\Core\Common\Modules\Connect\Module as ConnectModule;
-use Elementor\Core\App\Modules\KitLibrary\Data\Kits\Controller as Kits_Controller;
-use Elementor\Core\App\Modules\KitLibrary\Data\Taxonomies\Controller as Taxonomies_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly
+	exit; // Exit if accessed directly.
 }
 
 class Module extends BaseModule {
@@ -25,57 +24,59 @@ class Module extends BaseModule {
 		return 'kit-library';
 	}
 
-	/**
-	 * Register the admin menu.
-	 */
-	private function register_admin_menu() {
-		add_submenu_page(
-			Source_Local::ADMIN_MENU_SLUG,
-			__( 'Kit Library', 'elementor' ),
-			__( 'Kit Library', 'elementor' ),
-			'manage_options',
-			Plugin::$instance->app->get_base_url() . '#/kit-library'
-		);
-	}
-
 	private function set_kit_library_settings() {
-		if ( ! Plugin::$instance->common ) {
+		$common = Plugin::elementor()->common;
+		$app = Plugin::elementor()->app;
+
+		$prev_settings = $app->get_settings( 'kit-library' );
+
+		// BC Support.
+		if ( ! $prev_settings || ! $common ) {
 			return;
 		}
 
-		/** @var ConnectModule $connect */
-		$connect = Plugin::$instance->common->get_component( 'connect' );
+		/** @var Activate $activate */
+		$activate = $common->get_component( 'connect' )->get_app( 'activate' );
 
 		/** @var Kit_Library $kit_library */
-		$kit_library = $connect->get_app( 'kit-library' );
+		$kit_library = $common->get_component( 'connect' )->get_app( 'kit-library' );
 
-		Plugin::$instance->app->set_settings( 'kit-library', [
-			'has_access_to_module' => current_user_can( 'administrator' ),
-			'subscription_plans' => $connect->get_subscription_plans( 'wp-kit-library' ),
-			'is_pro' => false,
-			'is_library_connected' => $kit_library->is_connected(),
-			'library_connect_url'  => $kit_library->get_admin_url( 'authorize' ),
-			'access_level' => ConnectModule::ACCESS_LEVEL_CORE,
-		] );
+		$app->set_settings( 'kit-library', array_merge( $prev_settings, [
+			'is_pro' => true,
+			'is_library_connected' => API::is_license_active() && $kit_library && $kit_library->is_connected(),
+			'library_connect_url' => $activate->get_admin_url( 'authorize' ),
+			'access_level' => API::get_library_access_level( 'kit' ),
+		] ) );
 	}
 
 	/**
-	 * Module constructor.
+	 * @param array $connect_info
+	 * @param       $app
+	 *
+	 * @return array
 	 */
+	private function add_license_to_connect_info( array $connect_info, $app ) {
+		$license_key = Admin::get_license_key();
+
+		// In elementor 3.3.0-beta it does not send the $app parameter and it should add the license.
+		$bc_support = ! $app;
+		$is_kit_library_request = $app && Kit_Library::class === get_class( $app );
+
+		if ( ! empty( $license_key ) && ( $bc_support || $is_kit_library_request ) ) {
+			$connect_info['license'] = $license_key;
+		}
+
+		return $connect_info;
+	}
+
+
 	public function __construct() {
-		Plugin::$instance->data_manager->register_controller( Kits_Controller::class );
-		Plugin::$instance->data_manager->register_controller( Taxonomies_Controller::class );
-
-		add_action( 'admin_menu', function () {
-			$this->register_admin_menu();
-		}, 50 /* after Elementor page */ );
-
-		add_action( 'elementor/connect/apps/register', function ( ConnectModule $connect_module ) {
-			$connect_module->register_app( 'kit-library', Kit_Library::get_class_name() );
-		} );
-
 		add_action( 'elementor/init', function () {
 			$this->set_kit_library_settings();
-		}, 12 /** after the initiation of the connect kit library */ );
+		}, 13 /** after elementor core */ );
+
+		add_filter( 'elementor/connect/additional-connect-info', function ( array $connect_info, $app = null ) {
+			return $this->add_license_to_connect_info( $connect_info, $app );
+		}, 10, 2 );
 	}
 }

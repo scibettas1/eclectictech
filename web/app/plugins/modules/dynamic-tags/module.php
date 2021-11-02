@@ -1,160 +1,115 @@
 <?php
-namespace Elementor\Modules\DynamicTags;
+namespace ElementorPro\Modules\DynamicTags;
 
-use Elementor\Core\Base\Module as BaseModule;
-use Elementor\Core\DynamicTags\Manager;
-use Elementor\Core\DynamicTags\Tag;
-use Elementor\Plugin;
+use Elementor\Modules\DynamicTags\Module as TagsModule;
+use ElementorPro\Modules\DynamicTags\ACF;
+use ElementorPro\Modules\DynamicTags\Toolset;
+use ElementorPro\Modules\DynamicTags\Pods;
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Exit if accessed directly.
+	exit; // Exit if accessed directly
 }
 
-/**
- * Elementor dynamic tags module.
- *
- * Elementor dynamic tags module handler class is responsible for registering
- * and managing Elementor dynamic tags modules.
- *
- * @since 2.0.0
- */
-class Module extends BaseModule {
+class Module extends TagsModule {
 
-	/**
-	 * Base dynamic tag group.
-	 */
-	const BASE_GROUP = 'base';
+	const AUTHOR_GROUP = 'author';
 
-	/**
-	 * Dynamic tags text category.
-	 */
-	const TEXT_CATEGORY = 'text';
+	const POST_GROUP = 'post';
 
-	/**
-	 * Dynamic tags URL category.
-	 */
-	const URL_CATEGORY = 'url';
+	const COMMENTS_GROUP = 'comments';
 
-	/**
-	 * Dynamic tags image category.
-	 */
-	const IMAGE_CATEGORY = 'image';
+	const SITE_GROUP = 'site';
 
-	/**
-	 * Dynamic tags media category.
-	 */
-	const MEDIA_CATEGORY = 'media';
+	const ARCHIVE_GROUP = 'archive';
 
-	/**
-	 * Dynamic tags post meta category.
-	 */
-	const POST_META_CATEGORY = 'post_meta';
+	const MEDIA_GROUP = 'media';
 
-	/**
-	 * Dynamic tags gallery category.
-	 */
-	const GALLERY_CATEGORY = 'gallery';
+	const ACTION_GROUP = 'action';
 
-	/**
-	 * Dynamic tags number category.
-	 */
-	const NUMBER_CATEGORY = 'number';
-
-	/**
-	 * Dynamic tags number category.
-	 */
-	const COLOR_CATEGORY = 'color';
-
-	/**
-	 * Dynamic tags module constructor.
-	 *
-	 * Initializing Elementor dynamic tags module.
-	 *
-	 * @since 2.0.0
-	 * @access public
-	 */
 	public function __construct() {
-		$this->register_groups();
+		parent::__construct();
 
-		add_action( 'elementor/dynamic_tags/register_tags', [ $this, 'register_tags' ] );
+		// ACF 5 and up
+		if ( class_exists( '\acf' ) && function_exists( 'acf_get_field_groups' ) ) {
+			$this->add_component( 'acf', new ACF\Module() );
+		}
+
+		if ( function_exists( 'wpcf_admin_fields_get_groups' ) ) {
+			$this->add_component( 'toolset', new Toolset\Module() );
+		}
+
+		if ( function_exists( 'pods' ) ) {
+			$this->add_component( 'pods', new Pods\Module() );
+		}
 	}
 
-	/**
-	 * Get module name.
-	 *
-	 * Retrieve the dynamic tags module name.
-	 *
-	 * @since 2.0.0
-	 * @access public
-	 *
-	 * @return string Module name.
-	 */
 	public function get_name() {
-		return 'dynamic_tags';
+		return 'tags';
 	}
 
-	/**
-	 * Get classes names.
-	 *
-	 * Retrieve the dynamic tag classes names.
-	 *
-	 * @since 2.0.0
-	 * @access public
-	 *
-	 * @return array Tag dynamic tag classes names.
-	 */
 	public function get_tag_classes_names() {
-		return [];
-	}
-
-	/**
-	 * Get groups.
-	 *
-	 * Retrieve the dynamic tag groups.
-	 *
-	 * @since 2.0.0
-	 * @access public
-	 *
-	 * @return array Tag dynamic tag groups.
-	 */
-	public function get_groups() {
 		return [
-			self::BASE_GROUP => [
-				'title' => 'Base Tags',
-			],
+			'Archive_Description',
+			'Archive_Meta',
+			'Archive_Title',
+			'Archive_URL',
+			'Author_Info',
+			'Author_Meta',
+			'Author_Name',
+			'Author_Profile_Picture',
+			'Author_URL',
+			'Comments_Number',
+			'Comments_URL',
+			'Page_Title',
+			'Post_Custom_Field',
+			'Post_Date',
+			'Post_Excerpt',
+			'Post_Featured_Image',
+			'Post_Gallery',
+			'Post_ID',
+			'Post_Terms',
+			'Post_Time',
+			'Post_Title',
+			'Post_URL',
+			'Site_Logo',
+			'Site_Tagline',
+			'Site_Title',
+			'Site_URL',
+			'Internal_URL',
+			'Current_Date_Time',
+			'Request_Parameter',
+			'Lightbox',
+			'Featured_Image_Data',
+			'Shortcode',
+			'Contact_URL',
+			'User_Info',
+			'User_Profile_Picture',
 		];
 	}
 
-	/**
-	 * Register groups.
-	 *
-	 * Add all the available tag groups.
-	 *
-	 * @since 2.0.0
-	 * @access private
-	 */
-	private function register_groups() {
-		foreach ( $this->get_groups() as $group_name => $group_settings ) {
-			Plugin::$instance->dynamic_tags->register_group( $group_name, $group_settings );
-		}
-	}
-
-	/**
-	 * Register tags.
-	 *
-	 * Add all the available dynamic tags.
-	 *
-	 * @since 2.0.0
-	 * @access public
-	 *
-	 * @param Manager $dynamic_tags
-	 */
-	public function register_tags( $dynamic_tags ) {
-		foreach ( $this->get_tag_classes_names() as $tag_class ) {
-			/** @var Tag $class_name */
-			$class_name = $this->get_reflection()->getNamespaceName() . '\Tags\\' . $tag_class;
-
-			$dynamic_tags->register_tag( $class_name );
-		}
+	public function get_groups() {
+		return [
+			self::POST_GROUP => [
+				'title' => __( 'Post', 'elementor-pro' ),
+			],
+			self::ARCHIVE_GROUP => [
+				'title' => __( 'Archive', 'elementor-pro' ),
+			],
+			self::SITE_GROUP => [
+				'title' => __( 'Site', 'elementor-pro' ),
+			],
+			self::MEDIA_GROUP => [
+				'title' => __( 'Media', 'elementor-pro' ),
+			],
+			self::ACTION_GROUP => [
+				'title' => __( 'Actions', 'elementor-pro' ),
+			],
+			self::AUTHOR_GROUP => [
+				'title' => __( 'Author', 'elementor-pro' ),
+			],
+			self::COMMENTS_GROUP => [
+				'title' => __( 'Comments', 'elementor-pro' ),
+			],
+		];
 	}
 }

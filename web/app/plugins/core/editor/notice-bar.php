@@ -1,69 +1,59 @@
 <?php
-namespace Elementor\Core\Editor;
+namespace ElementorPro\Core\Editor;
 
-use Elementor\Core\Base\Base_Object;
-use Elementor\Core\Common\Modules\Ajax\Module as Ajax;
-use Elementor\Plugin;
-use Elementor\Utils;
+use Elementor\Core\Editor\Notice_Bar as Base_Notice_Bar;
+use ElementorPro\License\API as License_API;
+use ElementorPro\Plugin;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly
 }
 
-class Notice_Bar extends Base_Object {
+class Notice_Bar extends Base_Notice_Bar {
 
 	protected function get_init_settings() {
-		if ( Plugin::$instance->get_install_time() > strtotime( '-30 days' ) ) {
+		$license_data = License_API::get_license_data();
+		$license_admin = Plugin::instance()->license_admin;
+
+		if ( License_API::STATUS_EXPIRED === $license_data['license'] ) {
+			return [
+				'option_key' => '_elementor_pro_editor_renew_license_notice_dismissed',
+				'message' => __( 'Renew Elementor Pro and enjoy updates, support and Pro templates for another year.', 'elementor-pro' ),
+				'action_title' => __( 'Renew Now', 'elementor-pro' ),
+				'action_url' => 'https://go.elementor.com/editor-notice-bar-renew/',
+				'muted_period' => 30,
+			];
+		}
+
+		if ( ! License_API::is_license_active() ) {
+			return [
+				'option_key' => '_elementor_pro_editor_activate_license_notice_dismissed',
+				'message' => __( 'Activate Your License and Get Access to Premium Elementor Templates, Support & Plugin Updates.', 'elementor-pro' ),
+				'action_title' => __( 'Connect & Activate', 'elementor-pro' ),
+				'action_url' => $license_admin->get_connect_url( [
+					'mode' => 'popup',
+					'callback_id' => 'editor-pro-activate',
+				] ),
+				'muted_period' => 0,
+			];
+		}
+
+		if ( ! License_API::is_license_about_to_expire() ) {
 			return [];
 		}
 
+		if ( isset( $license_data['renewal_discount'] ) && 0 < $license_data['renewal_discount'] ) {
+			$message = sprintf( __( 'Oh-oh... Looks like your Elementor Pro license is about to expire. Renew now and get an exclusive, time-limited %s discount.', 'elementor-pro' ), $license_data['renewal_discount'] . '&#37;' );
+		} else {
+			$message = __( 'Oh-oh! Your Elementor Pro license is about to expire. Renew now and enjoy updates, support and Pro templates for another year.', 'elementor-pro' );
+		}
+
 		return [
-			'muted_period' => 90,
-			'option_key' => '_elementor_editor_upgrade_notice_dismissed',
-			'message' => sprintf(
-				/* translators: 1: Link open tag, 2: Link close tag. */
-				esc_html__( 'Love using Elementor? %1$sLearn how you can build better sites with Elementor Pro.%2$s', 'elementor' ),
-				'<a href="%s">',
-				'</a>'
-			),
-			'action_title' => esc_html__( 'Go Pro', 'elementor' ),
-			'action_url' => Utils::get_pro_link( 'https://elementor.com/pro/?utm_source=editor-notice-bar&utm_campaign=gopro&utm_medium=wp-dash' ),
+			'option_key' => '_elementor_pro_editor_renew_about_to_expire_license_notice_dismissed',
+			'message' => $message,
+			'action_title' => __( 'Renew Now', 'elementor-pro' ),
+			'action_url' => 'https://go.elementor.com/editor-notice-bar-renew/',
+			'muted_period' => 10,
 		];
-	}
-
-	final public function get_notice() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return null;
-		}
-
-		$settings = $this->get_settings();
-
-		if ( empty( $settings['option_key'] ) ) {
-			return null;
-		}
-
-		$dismissed_time = get_option( $settings['option_key'] );
-
-		if ( $dismissed_time ) {
-			if ( $dismissed_time > strtotime( '-' . $settings['muted_period'] . ' days' ) ) {
-				return null;
-			}
-
-			$this->set_notice_dismissed();
-		}
-
-		return $settings;
-	}
-
-	public function __construct() {
-		add_action( 'elementor/ajax/register_actions', [ $this, 'register_ajax_actions' ] );
-	}
-
-	public function set_notice_dismissed() {
-		update_option( $this->get_settings( 'option_key' ), time() );
-	}
-
-	public function register_ajax_actions( Ajax $ajax ) {
-		$ajax->register_ajax_action( 'notice_bar_dismiss', [ $this, 'set_notice_dismissed' ] );
 	}
 }
